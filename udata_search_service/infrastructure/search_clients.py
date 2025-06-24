@@ -9,7 +9,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch_dsl import Date, Document, Float, Integer, Keyword, Text, tokenizer, token_filter, analyzer, query
 from elasticsearch_dsl.connections import connections
-from udata_search_service.domain.entities import Dataset, Organization, Reuse, Dataservice
+from udata_search_service.domain.entities import Dataset, Organization, Reuse, Dataservice, Topic
 from udata_search_service.config import Config
 from udata_search_service.infrastructure.utils import IS_TTY
 
@@ -82,6 +82,21 @@ class SearchableDataservice(IndexDocument):
 
     class Index:
         name = f'{Config.UDATA_INSTANCE_NAME}-dataservice'
+
+class SearchableTopic(IndexDocument):
+    name = Text(analyzer=dgv_analyzer)
+    created_at = Date()
+    tags = Keyword(multi=True)
+    organization = Keyword()
+    description = Text(analyzer=dgv_analyzer)
+    organization_name = Text(analyzer=dgv_analyzer)
+    owner = Keyword()
+    granularity = Keyword()
+    geozones = Keyword(multi=True)
+    last_modified = Date()
+
+    class Index:
+        name = f'{Config.UDATA_INSTANCE_NAME}-topic'
 
 
 class SearchableOrganization(IndexDocument):
@@ -175,6 +190,7 @@ class ElasticClient:
         SearchableReuse.init_index(self.es, suffix_name)
         SearchableOrganization.init_index(self.es, suffix_name)
         SearchableDataservice.init_index(self.es, suffix_name)
+        SearchableTopic.init_index(self.es, suffix_name)
 
     def clean_indices(self) -> None:
         '''
@@ -188,20 +204,24 @@ class ElasticClient:
         SearchableReuse.delete_indices(self.es)
         SearchableOrganization.delete_indices(self.es)
         SearchableDataservice.delete_indices(self.es)
+        SearchableTopic.delete_indices(self.es)
 
         self.init_indices()
 
-    def index_organization(self, to_index: Organization, index: str = None) -> None:
+    def index_organization(self, to_index: Organization, index: str | None = None) -> None:
         SearchableOrganization(meta={'id': to_index.id}, **to_index.to_dict()).save(skip_empty=False, index=index)
 
-    def index_dataset(self, to_index: Dataset, index: str = None) -> None:
+    def index_dataset(self, to_index: Dataset, index: str | None = None) -> None:
         SearchableDataset(meta={'id': to_index.id}, **to_index.to_dict()).save(skip_empty=False, index=index)
 
-    def index_reuse(self, to_index: Reuse, index: str = None) -> None:
+    def index_reuse(self, to_index: Reuse, index: str | None = None) -> None:
         SearchableReuse(meta={'id': to_index.id}, **to_index.to_dict()).save(skip_empty=False, index=index)
 
-    def index_dataservice(self, to_index: Dataservice, index: str = None) -> None:
+    def index_dataservice(self, to_index: Dataservice, index: str | None = None) -> None:
         SearchableDataservice(meta={'id': to_index.id}, **to_index.to_dict()).save(skip_empty=False, index=index)
+
+    def index_topic(self, to_index: Topic, index: str | None = None) -> None:
+        SearchableTopic(meta={'id': to_index.id}, **to_index.to_dict()).save(skip_empty=False, index=index)
 
     def query_organizations(self, query_text: str, offset: int, page_size: int, filters: dict, sort: Optional[str] = None) -> Tuple[int, List[dict]]:
         search = SearchableOrganization.search()
@@ -417,6 +437,91 @@ class ElasticClient:
         res = [hit.to_dict(skip_empty=False) for hit in response.hits]
         return results_number, res
 
+    def query_topics(self, query_text: str, offset: int, page_size: int, filters: dict, sort: Optional[str] = None) -> Tuple[int, List[dict]]:
+        search = SearchableTopic.search()
+
+        for key, value in filters.items():
+            if key == 'tags':
+                # build an AND filter from tags list
+                tag_filters = [query.Q('term', tags=tag) for tag in value]
+                search = search.filter(
+                    query.Bool(must=tag_filters)
+                )
+            else:
+                search = search.filter('term', **{key: value})
+
+        topics_score_functions = [
+            query.SF("field_value_factor", field="orga_sp", factor=8, modifier='sqrt', missing=1),
+            query.SF("field_value_factor", field="orga_followers", factor=1, modifier='sqrt', missing=1),
+            query.SF("field_value_factor", field="featured", factor=1, modifier='sqrt', missing=1),
+        ]
+
+        if query_text:
+            search = search.query(
+                "bool",
+                should=[
+                    query.Q(
+                        "function_score",
+                        query=query.Bool(
+                            should=[
+                                query.MultiMatch(
+                                    query=query_text,
+                                    type="phrase",
+                                    fields=[
+                                        "name^15",
+                                        "description^8",
+                                        "organization_name^8",
+                                    ],
+                                )
+                            ]
+                        ),
+                        functions=topics_score_functions,
+                    ),
+                    query.Q(
+                        "function_score",
+                        query=query.Bool(
+                            should=[
+                                query.MultiMatch(
+                                    query=query_text,
+                                    type="cross_fields",
+                                    fields=[
+                                        "name^7",
+                                        "description^4",
+                                        "organization_name^4",
+                                    ],
+                                    operator="and",
+                                )
+                            ]
+                        ),
+                        functions=topics_score_functions,
+                    ),
+                    query.MultiMatch(
+                        query=query_text,
+                        type="most_fields",
+                        operator="and",
+                        fields=["name", "organization_name"],
+                        fuzziness="AUTO:4,6",
+                    ),
+                ],
+            )
+        else:
+            search = search.query(query.Q('function_score', query=query.MatchAll(), functions=topics_score_functions))
+
+        if sort:
+            search = search.sort(sort, {'_score': {'order': 'desc'}})
+
+        search = search[offset:(offset + page_size)]
+
+        response = search.execute()
+        results_number = response.hits.total.value
+        if response.hits and not isinstance(response.hits[0], SearchableTopic):
+            raise ValueError(
+                'Results are not of SearchableTopic type. It probably means that index analyzers were not correctly set '
+                'using template patterns on index initialization.'
+            )
+        res = [hit.to_dict(skip_empty=False) for hit in response.hits]
+        return results_number, res
+
     def find_one_organization(self, organization_id: str) -> Optional[dict]:
         try:
             return SearchableOrganization.get(id=organization_id).to_dict()
@@ -438,6 +543,14 @@ class ElasticClient:
     def find_one_dataservice(self, dataservice_id: str) -> Optional[dict]:
         try:
             return SearchableDataservice.get(id=dataservice_id).to_dict()
+        except NotFoundError:
+            return None
+
+    def find_one_topic(self, topic_id: str) -> Optional[dict]:
+        try:
+            topic = SearchableTopic.get(id=topic_id)
+            if topic:
+                return topic.to_dict()
         except NotFoundError:
             return None
 
@@ -466,5 +579,14 @@ class ElasticClient:
         try:
             SearchableDataservice.get(id=dataservice_id).delete()
             return dataservice_id
+        except NotFoundError:
+            return None
+
+    def delete_one_topic(self, topic_id: str) -> Optional[str]:
+        try:
+            topic = SearchableTopic.get(id=topic_id)
+            if topic:
+                topic.delete()
+                return topic_id
         except NotFoundError:
             return None

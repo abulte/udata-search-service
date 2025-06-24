@@ -1,7 +1,7 @@
 import datetime
 import factory
 
-from udata_search_service.domain.entities import Dataservice, Dataset, Organization, Reuse
+from udata_search_service.domain.entities import Dataservice, Dataset, Organization, Reuse, Topic
 
 
 class DatasetFactory(factory.Factory):
@@ -92,3 +92,25 @@ class DataserviceFactory(factory.Factory):
     organization = factory.Faker('md5')
     organization_name = factory.Faker('company')
     owner = factory.Faker('md5')
+
+
+class TopicFactory(factory.Factory):
+    class Meta:
+        model = Topic
+
+    id = factory.Faker("md5")
+    name = factory.Faker("sentence")
+    description = factory.Faker("text")
+    created_at = factory.LazyFunction(datetime.datetime.utcnow)
+    featured = factory.Faker("boolean")
+    organization = factory.Faker("md5")
+    organization_name = factory.Faker("company")
+    owner = factory.Faker("md5")
+    tags = []
+    last_modified = factory.LazyFunction(datetime.datetime.utcnow)
+    granularity = factory.Faker('word')
+    geozones = factory.Faker('word')
+
+    @factory.lazy_attribute
+    def featured_score(self) -> int:
+        return 4 if self.featured else 1

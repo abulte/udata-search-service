@@ -1,7 +1,7 @@
 import copy
 import datetime
 
-from udata_search_service.infrastructure.consumers import ReuseConsumer, OrganizationConsumer, DataserviceConsumer, DatasetConsumer
+from udata_search_service.infrastructure.consumers import ReuseConsumer, OrganizationConsumer, DataserviceConsumer, DatasetConsumer, TopicConsumer
 from udata_search_service.infrastructure.utils import get_concat_title_org, log2p, mdstrip
 
 
@@ -169,6 +169,46 @@ def test_parse_dataservice_obj():
     assert document['organization_name'] == obj['organization']['name']
     assert document['orga_followers'] == log2p(obj['organization']['followers'])
     assert document['description_length'] == log2p(len(mdstrip(obj['description'])))
+
+
+def test_parse_topic_obj():
+    obj = {
+        "id": "683eb313821ff4ee63a1aed3",
+        "name": "Bouquet de test migration xxx",
+        "description": 'Bouquet de test migration\n\n- Thématique Mieux consommer\n- 4 facteurs, 1 pour chaque availabilty\n- 2 groupes, 1 pour "missing" et l\'autre "available"\n- Couverture territoriale Ardennes\n- Organisation DDT Maine et Loire',
+        "tags": ["ecospheres", "ecospheres-theme-mieux-consommer"],
+        # TODO:
+        # "elements": [],
+        "featured": False,
+        "created_at": "2025-06-03T08:32:19.655000+00:00",
+        "geozones": [{"id": "fr:arrondissement:353", "name": "Rennes", "keys": ["353"]},
+                     {"id": "country-group:world"},
+                     {"id": "country:fr"},
+                     {"id": "country-group:ue"}],
+        "granularity": "fr:commune",
+        "last_modified": "2025-06-20T07:24:51.798000+00:00",
+        "organization": {
+            "name": "DDT Maine-et-Loire",
+            "id": "6733676069a129ff84be5753",
+        },
+        "owner": None,
+        "extras": {},
+    }
+    document = TopicConsumer.load_from_dict(copy.deepcopy(obj)).to_dict()
+
+    # Make sure that these fields are loaded as is
+    for key in ["id", "name", "tags", "owner", "featured"]:
+        assert document[key] == obj[key]
+
+    # Make sure that markdown fields are stripped
+    assert document["description"] == mdstrip(obj["description"])
+
+    # Make sure that all other particular fields are treated accordingly
+    assert document["created_at"].date() == datetime.date(2025, 6, 3)
+    assert document["last_modified"].date() == datetime.date(2025, 6, 20)
+    assert document["organization"] == obj["organization"]["id"]
+    assert document["granularity"] == "fr:commune"
+    assert document["geozones"] == ["fr:arrondissement:353", "country-group:world", "country:fr", "country-group:ue"]
 
 
 def test_parse_organization_obj():

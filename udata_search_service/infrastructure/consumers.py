@@ -1,7 +1,7 @@
 import logging
 import os
 
-from udata_search_service.domain.entities import Dataset, Organization, Reuse, Dataservice
+from udata_search_service.domain.entities import Dataset, Organization, Reuse, Dataservice, Topic
 from udata_search_service.infrastructure.utils import get_concat_title_org, log2p, mdstrip
 
 
@@ -85,5 +85,24 @@ class DataserviceConsumer(Dataservice):
         data["followers"] = log2p(data.get("followers", 0))
         data["orga_followers"] = log2p(data.get("orga_followers", 0))
         data["description_length"] = log2p(data["description_length"])
+
+        return super().load_from_dict(data)
+
+class TopicConsumer(Topic):
+    @classmethod
+    def load_from_dict(cls, data):
+        # Strip markdown
+        data["description"] = mdstrip(data["description"])
+
+        organization = data["organization"]
+        data["organization"] = organization.get('id') if organization else None
+        data["orga_followers"] = organization.get('followers') if organization else None
+        data["orga_sp"] = organization.get('public_service') if organization else None
+
+        data["geozones"] = [zone.get("id") for zone in data.get("geozones", [])]
+
+        # Normalize values
+        # Use 4 as "on" value for featured, like for datasets
+        data["featured_score"] = 4 if data.get("featured", False) is True else 1
 
         return super().load_from_dict(data)

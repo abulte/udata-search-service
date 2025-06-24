@@ -1,12 +1,12 @@
 import datetime
 import time
 
-from udata_search_service.domain.factories import DataserviceFactory, DatasetFactory, OrganizationFactory, ReuseFactory
+from udata_search_service.domain.factories import DataserviceFactory, DatasetFactory, OrganizationFactory, ReuseFactory, TopicFactory
 
 ext_word_list = ['abc', 'def', 'hij', 'klm', 'nop', 'qrs', 'tuv']
 
 
-def test_general_search_with_and_without_query(app, client, search_client, faker):
+def test_general_search_with_and_without_query(search_client, faker):
     for i in range(4):
         search_client.index_dataset(DatasetFactory(
             title='test-{0}'.format(i) if i % 2 else faker.word(ext_word_list=ext_word_list),
@@ -24,6 +24,10 @@ def test_general_search_with_and_without_query(app, client, search_client, faker
             title='test-{0}'.format(i) if i % 2 else faker.word(ext_word_list=ext_word_list),
             description='udata' if i == 1 else faker.word()
         ))
+        search_client.index_topic(TopicFactory(
+            name='test-{0}'.format(i) if i % 2 else faker.word(ext_word_list=ext_word_list),
+            description='udata' if i == 1 else faker.word()
+        ))
     # Without this, ElasticSearch does not seem to have the time to index.
     time.sleep(2)
 
@@ -36,6 +40,8 @@ def test_general_search_with_and_without_query(app, client, search_client, faker
     assert results_number == 2
     results_number, res = search_client.query_dataservices('test', 0, 20, {})
     assert results_number == 2
+    results_number, _ = search_client.query_topics('test', 0, 20, {})
+    assert results_number == 2
 
     # Should return only the object with string 'test' and 'udata' in their titles/names or desc
     results_number, res = search_client.query_datasets('test udata', 0, 20, {})
@@ -46,6 +52,8 @@ def test_general_search_with_and_without_query(app, client, search_client, faker
     assert results_number == 1
     results_number, res = search_client.query_dataservices('test udata', 0, 20, {})
     assert results_number == 1
+    results_number, _ = search_client.query_topics('test udata', 0, 20, {})
+    assert results_number == 1
 
     # Should return all objects, as query text is none
     results_number, res = search_client.query_datasets(None, 0, 20, {})
@@ -55,6 +63,8 @@ def test_general_search_with_and_without_query(app, client, search_client, faker
     results_number, res = search_client.query_reuses(None, 0, 20, {})
     assert results_number == 4
     results_number, res = search_client.query_dataservices(None, 0, 20, {})
+    assert results_number == 4
+    results_number, _ = search_client.query_topics(None, 0, 20, {})
     assert results_number == 4
 
 
@@ -94,6 +104,9 @@ def test_search_with_orga_id_filter(app, client, search_client, faker):
     search_client.index_dataservice(DataserviceFactory(
         organization='77f01c346bf99eab7c198891'
     ))
+    search_client.index_topic(TopicFactory(
+        organization='77f01c346bf99eab7c198891'
+    ))
 
     # Without this, ElasticSearch does not seem to have the time to index.
     time.sleep(2)
@@ -107,6 +120,8 @@ def test_search_with_orga_id_filter(app, client, search_client, faker):
     results_number, res = search_client.query_reuses(None, 0, 20, {'organization': '77f01c346bf99eab7c198891'})
     assert results_number == 1
     results_number, res = search_client.query_dataservices(None, 0, 20, {'organization': '77f01c346bf99eab7c198891'})
+    assert results_number == 1
+    results_number, _ = search_client.query_topics(None, 0, 20, {'organization': '77f01c346bf99eab7c198891'})
     assert results_number == 1
 
 
@@ -149,6 +164,10 @@ def test_search_with_owner_filter(app, client, search_client, faker):
         owner='77f01c346bf99eab7c198891'
     ))
 
+    search_client.index_topic(TopicFactory(
+        owner='77f01c346bf99eab7c198891'
+    ))
+
     # Without this, ElasticSearch does not seem to have the time to index.
     time.sleep(2)
 
@@ -161,6 +180,8 @@ def test_search_with_owner_filter(app, client, search_client, faker):
     results_number, res = search_client.query_reuses(None, 0, 20, {'owner': '77f01c346bf99eab7c198891'})
     assert results_number == 1
     results_number, res = search_client.query_dataservices(None, 0, 20, {'owner': '77f01c346bf99eab7c198891'})
+    assert results_number == 1
+    results_number, _ = search_client.query_topics(None, 0, 20, {'owner': '77f01c346bf99eab7c198891'})
     assert results_number == 1
 
 
@@ -201,6 +222,10 @@ def test_search_with_tag_filter(app, client, search_client, faker):
             tags=['test-tag'] if i % 2 else ['not-test-tag']
         ))
 
+        search_client.index_topic(TopicFactory(
+            tags=['test-tag', f'test-tag-{i}'] if i % 2 else ['not-test-tag']
+        ))
+
     # Without this, ElasticSearch does not seem to have the time to index.
     time.sleep(2)
 
@@ -215,6 +240,12 @@ def test_search_with_tag_filter(app, client, search_client, faker):
     results_number, res = search_client.query_reuses(None, 0, 20, {'tags': 'test-tag'})
     assert results_number == 2
     results_number, res = search_client.query_dataservices(None, 0, 20, {'tags': 'test-tag'})
+    assert results_number == 2
+    results_number, _ = search_client.query_topics(None, 0, 20, {})
+    assert results_number == 4
+    results_number, _ = search_client.query_topics(None, 0, 20, {'tags': ['test-tag', 'test-tag-1']})
+    assert results_number == 1
+    results_number, _ = search_client.query_topics(None, 0, 20, {'tags': ['not-test-tag']})
     assert results_number == 2
 
 
@@ -262,6 +293,20 @@ def test_search_dataset_with_geozone_filter(app, client, search_client, faker):
     results_number, res = search_client.query_datasets(None, 0, 20, {'geozones': 'country:fr'})
     assert results_number == 2
 
+def test_search_topic_with_geozone_filter(search_client):
+    for i in range(4):
+        search_client.index_topic(TopicFactory(
+            geozones='country:fr' if i % 2 else 'country:ro'
+        ))
+
+    # Without this, ElasticSearch does not seem to have the time to index.
+    time.sleep(2)
+
+    results_number, _ = search_client.query_topics(None, 0, 20, {})
+    assert results_number == 4
+    results_number, _ = search_client.query_topics(None, 0, 20, {'geozones': 'country:fr'})
+    assert results_number == 2
+
 
 def test_search_dataset_with_granularity_filter(app, client, search_client, faker):
     for i in range(4):
@@ -275,6 +320,21 @@ def test_search_dataset_with_granularity_filter(app, client, search_client, fake
     results_number, res = search_client.query_datasets(None, 0, 20, {})
     assert results_number == 4
     results_number, res = search_client.query_datasets(None, 0, 20, {'granularity': 'country'})
+    assert results_number == 2
+
+
+def test_search_topic_with_granularity_filter(search_client):
+    for i in range(4):
+        search_client.index_topic(TopicFactory(
+            granularity='country' if i % 2 else 'country-subset'
+        ))
+
+    # Without this, ElasticSearch does not seem to have the time to index.
+    time.sleep(2)
+
+    results_number, _ = search_client.query_topics(None, 0, 20, {})
+    assert results_number == 4
+    results_number, _ = search_client.query_topics(None, 0, 20, {'granularity': 'country'})
     assert results_number == 2
 
 
@@ -341,7 +401,7 @@ def test_search_dataservice_with_is_restricted_filter(app, client, search_client
     assert results_number == 2
 
 
-def test_general_search_with_sorting(app, client, search_client, faker):
+def test_general_search_with_sorting(search_client):
     search_client.index_dataset(DatasetFactory(
         title='data-test-1',
         followers=0
@@ -374,6 +434,14 @@ def test_general_search_with_sorting(app, client, search_client, faker):
         title='dataservice-test-2',
         followers=3
     ))
+    search_client.index_topic(TopicFactory(
+        name='a-topic',
+        created_at=datetime.datetime.now(),
+    ))
+    search_client.index_topic(TopicFactory(
+        name='b-topic',
+        created_at=datetime.datetime.now(),
+    ))
     # Without this, ElasticSearch does not seem to have the time to index.
     time.sleep(2)
 
@@ -386,6 +454,8 @@ def test_general_search_with_sorting(app, client, search_client, faker):
     assert res[0]['title'] == 'reuse-test-1'
     results_number, res = search_client.query_dataservices(None, 0, 20, {}, sort='followers')
     assert res[0]['title'] == 'dataservice-test-1'
+    _, res = search_client.query_topics(None, 0, 20, {}, sort='created_at')
+    assert res[0]['name'] == 'a-topic'
 
     # Sort descending
     results_number, res = search_client.query_datasets(None, 0, 20, {}, sort='-followers')
@@ -396,6 +466,8 @@ def test_general_search_with_sorting(app, client, search_client, faker):
     assert res[0]['title'] == 'reuse-test-2'
     results_number, res = search_client.query_dataservices(None, 0, 20, {}, sort='-followers')
     assert res[0]['title'] == 'dataservice-test-2'
+    _, res = search_client.query_topics(None, 0, 20, {}, sort='-created_at')
+    assert res[0]['name'] == 'b-topic'
 
 
 def test_general_search_with_sorting_last_update(app, client, search_client, faker):
@@ -430,3 +502,20 @@ def test_search_dataset_with_synonym(app, client, search_client, faker):
 
     results_number, res = search_client.query_datasets('recensement population', 0, 20, {})
     assert results_number == 1
+
+
+def test_search_topic_with_boolean_filters(search_client):
+    for i in range(4):
+        search_client.index_topic(TopicFactory(
+            featured=bool(i % 2),
+        ))
+
+    # Without this, ElasticSearch does not seem to have the time to index.
+    time.sleep(2)
+
+    results_number, _ = search_client.query_topics(None, 0, 20, {})
+    assert results_number == 4
+    results_number, _ = search_client.query_topics(None, 0, 20, {"featured": True})
+    assert results_number == 2
+    results_number, _ = search_client.query_topics(None, 0, 20, {"featured": False})
+    assert results_number == 2

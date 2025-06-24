@@ -2,7 +2,7 @@ import datetime
 import time
 from flask import url_for
 
-from udata_search_service.domain.factories import DatasetFactory, OrganizationFactory, ReuseFactory
+from udata_search_service.domain.factories import DatasetFactory, OrganizationFactory, ReuseFactory, TopicFactory
 
 
 def test_api_dataset_index_unindex(app, client, faker):
@@ -469,6 +469,74 @@ def test_api_dataservice_index_on_another_index(app, client, search_client, fake
 
     resp = search_client.es.get(index=f"{app.config['UDATA_INSTANCE_NAME']}-{index_name}", id=dataservice['id'])
     assert resp['_source']['title'] == dataservice['title']
+
+
+def test_api_topic_index_unindex(client, faker):
+    topic = {
+        'id': faker.md5(),
+        'name': faker.sentence(),
+        'description': faker.text(),
+        'created_at': faker.past_datetime().isoformat(),
+        'last_modified': faker.past_datetime().isoformat(),
+        'featured': faker.boolean(),
+        'organization': {
+            'id': faker.md5(),
+            'name': faker.company(),
+            'public_service': faker.random_int(min=0, max=1),
+            'followers': faker.random_int(),
+            'badges': [faker.word()]
+        },
+        'tags': [faker.word()],
+        'granularity': faker.word(),
+        'geozones': [{'id': faker.word(), 'name': faker.word(), 'keys': [faker.random_int()]},
+                     {'id': faker.word()}],
+        'owner': None,
+        'extras': {},
+    }
+
+    query = {
+        'document': topic,
+        'index': None
+    }
+
+    index_resp = client.post(url_for('api.topic_index'), json={'document': topic, 'index': 'random-non-existing-index'})
+    assert index_resp.status_code == 404
+
+    index_resp = client.post(url_for('api.topic_index'), json=query)
+    assert index_resp.status_code == 200
+
+    time.sleep(2)
+
+    topic_resp = client.get(url_for('api.topic_get_specific', topic_id=topic['id']))
+    assert topic_resp.status_code == 200
+    assert topic_resp.json['name'] == topic['name']
+
+    topic_search_resp = client.get(url_for('api.topic_search'))
+    assert len(topic_search_resp.json['data']) == 1
+    assert topic_search_resp.json['data'][0]['name'] == topic['name']
+    assert topic_search_resp.json['next_page'] is None
+    assert topic_search_resp.json['page'] == 1
+    assert topic_search_resp.json['previous_page'] is None
+    assert topic_search_resp.json['page_size'] == 20
+    assert topic_search_resp.json['total_pages'] == 1
+    assert topic_search_resp.json['total'] == 1
+
+    deletion_resp = client.delete(url_for('api.topic_unindex', topic_id=topic['id']))
+    assert deletion_resp.status_code == 200
+
+    time.sleep(2)
+
+    topic_get_after_delete_resp = client.get(url_for('api.topic_get_specific', topic_id=topic['id']))
+    assert topic_get_after_delete_resp.status_code == 404
+
+    topic_search_after_delete_resp = client.get(url_for('api.topic_search'))
+    assert len(topic_search_after_delete_resp.json['data']) == 0
+    assert topic_search_after_delete_resp.json['next_page'] is None
+    assert topic_search_after_delete_resp.json['page'] == 1
+    assert topic_search_after_delete_resp.json['previous_page'] is None
+    assert topic_search_after_delete_resp.json['page_size'] == 20
+    assert topic_search_after_delete_resp.json['total_pages'] == 1
+    assert topic_search_after_delete_resp.json['total'] == 0
 
 
 def test_api_search_without_query(app, client, search_client, faker):
