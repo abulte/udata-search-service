@@ -177,8 +177,7 @@ def test_parse_topic_obj():
         "name": "Bouquet de test migration xxx",
         "description": 'Bouquet de test migration\n\n- Thématique Mieux consommer\n- 4 facteurs, 1 pour chaque availabilty\n- 2 groupes, 1 pour "missing" et l\'autre "available"\n- Couverture territoriale Ardennes\n- Organisation DDT Maine et Loire',
         "tags": ["ecospheres", "ecospheres-theme-mieux-consommer"],
-        # TODO:
-        # "elements": [],
+        "elements_titles": "Titre 1 Titre 2",
         "featured": False,
         "created_at": "2025-06-03T08:32:19.655000+00:00",
         "geozones": [{"id": "fr:arrondissement:353", "name": "Rennes", "keys": ["353"]},
