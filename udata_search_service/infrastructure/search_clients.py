@@ -471,6 +471,7 @@ class ElasticClient:
                                         "name^15",
                                         "description^8",
                                         "organization_name^8",
+                                        "elements_titles^8",
                                     ],
                                 )
                             ]
@@ -488,6 +489,7 @@ class ElasticClient:
                                         "name^7",
                                         "description^4",
                                         "organization_name^4",
+                                        "elements_titles^4",
                                     ],
                                     operator="and",
                                 )

@@ -152,6 +152,8 @@ class Topic(EntityBase):
     orga_sp: int | None = None
     orga_followers: int | None = None
 
+    elements_titles: str | None = None
+
     def __post_init__(self):
         if isinstance(self.created_at, str):
             self.created_at = isoparse(self.created_at)

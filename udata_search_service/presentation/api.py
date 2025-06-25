@@ -525,11 +525,12 @@ class TopicToIndex(BaseModel):
     last_modified: str
     featured: bool
     description: str | None = None
-    organization: Optional[dict] = None
-    geozones: Optional[list] = []
-    granularity: Optional[str] = None
-    tags: Optional[list] = []
-    owner: Optional[str] = None
+    organization: dict | None = None
+    geozones: list = []
+    granularity: str | None = None
+    tags: list = []
+    owner: str | None = None
+    elements_titles: str | None = None
 
 
 class RequestTopicIndex(BaseModel):

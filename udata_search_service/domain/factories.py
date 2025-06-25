@@ -108,8 +108,9 @@ class TopicFactory(factory.Factory):
     owner = factory.Faker("md5")
     tags = []
     last_modified = factory.LazyFunction(datetime.datetime.utcnow)
-    granularity = factory.Faker('word')
-    geozones = factory.Faker('word')
+    granularity = factory.Faker("word")
+    geozones = factory.Faker("word")
+    elements_titles = factory.Faker("sentence")
 
     @factory.lazy_attribute
     def featured_score(self) -> int:
