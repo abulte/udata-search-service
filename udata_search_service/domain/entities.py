@@ -1,6 +1,6 @@
 import dataclasses
 from typing import List
-from datetime import datetime
+from datetime import date
 from dateutil.parser import isoparse
 
 
@@ -24,14 +24,14 @@ class Organization(EntityBase):
     description: str
     url: str
     orga_sp: int
-    created_at: datetime.date
+    created_at: date
     followers: int
     datasets: int
     views: int
     reuses: int
 
-    badges: List[str] = None
-    acronym: str = None
+    badges: List[str] | None = None
+    acronym: str | None = None
 
     def __post_init__(self):
         if isinstance(self.created_at, str):
@@ -43,7 +43,7 @@ class Dataset(EntityBase):
     id: str
     title: str
     url: str
-    created_at: datetime.date
+    created_at: date
     frequency: str
     format: List[str]
     views: int
@@ -54,24 +54,24 @@ class Dataset(EntityBase):
     concat_title_org: str
     description: str
 
-    last_update: datetime.date = None
-    acronym: str = None
-    badges: List[str] = None
-    tags: List[str] = None
-    license: str = None
-    temporal_coverage_start: datetime.date = None
-    temporal_coverage_end: datetime.date = None
-    granularity: str = None
-    geozones: List[str] = None
-    schema: List[str] = None
-    topics: List[str] = None
+    last_update: date | None = None
+    acronym: str | None = None
+    badges: List[str] | None = None
+    tags: List[str] | None = None
+    license: str | None = None
+    temporal_coverage_start: date | None = None
+    temporal_coverage_end: date | None = None
+    granularity: str | None = None
+    geozones: List[str] | None = None
+    schema: List[str] | None = None
+    topics: List[str] | None = None
 
-    orga_sp: int = None
-    orga_followers: int = None
-    organization: str = None
-    organization_name: str = None
-    organization_badges: List[str] = None
-    owner: str = None
+    orga_sp: int | None = None
+    orga_followers: int | None = None
+    organization: str | None = None
+    organization_name: str | None = None
+    organization_badges: List[str] | None = None
+    owner: str | None = None
 
     def __post_init__(self):
         if isinstance(self.created_at, str):
@@ -89,7 +89,7 @@ class Reuse(EntityBase):
     id: str
     title: str
     url: str
-    created_at: datetime.date
+    created_at: date
     views: int
     followers: int
     datasets: int
@@ -98,13 +98,13 @@ class Reuse(EntityBase):
     type: str
     topic: str
 
-    tags: List[str] = None
-    badges: List[str] = None
-    orga_followers: int = None
-    organization: str = None
-    organization_name: str = None
-    organization_badges: List[str] = None
-    owner: str = None
+    tags: List[str] | None = None
+    badges: List[str] | None = None
+    orga_followers: int | None = None
+    organization: str | None = None
+    organization_name: str | None = None
+    organization_badges: List[str] | None = None
+    owner: str | None = None
 
     def __post_init__(self):
         if isinstance(self.created_at, str):
@@ -117,17 +117,45 @@ class Dataservice(EntityBase):
     title: str
     description: str
     description_length: float
-    created_at: datetime.date
+    created_at: date
 
     views: int = 0
     followers: int = 0
-    is_restricted: bool = None
-    orga_followers: int = None
-    organization: str = None
-    organization_name: str = None
-    owner: str = None
-    tags: List[str] = None
+    is_restricted: bool | None = None
+    orga_followers: int | None = None
+    organization: str | None = None
+    organization_name: str | None = None
+    owner: str | None = None
+    tags: List[str] | None = None
 
     def __post_init__(self):
         if isinstance(self.created_at, str):
             self.created_at = isoparse(self.created_at)
+
+@dataclasses.dataclass
+class Topic(EntityBase):
+    id: str
+    name: str
+    created_at: date
+    featured: bool
+    featured_score: int
+
+    description: str | None = None
+    owner: str | None = None
+    tags: List[str] | None = None
+    granularity: str | None = None
+    geozones: List[str] | None = None
+    last_modified: date | None = None
+
+    organization: str | None = None
+    organization_name: str | None = None
+    orga_sp: int | None = None
+    orga_followers: int | None = None
+
+    elements_titles: str | None = None
+
+    def __post_init__(self):
+        if isinstance(self.created_at, str):
+            self.created_at = isoparse(self.created_at)
+        if isinstance(self.last_modified, str):
+            self.last_modified = isoparse(self.last_modified)
